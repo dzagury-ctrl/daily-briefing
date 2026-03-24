@@ -1,0 +1,37 @@
+name: Send Daily Briefing Email
+
+on:
+  push:
+    paths:
+      - 'briefings/*.html'
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find latest briefing
+        id: find
+        run: |
+          FILE=$(ls -t briefings/*.html | head -1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "Found: $FILE"
+
+      - name: Send via Resend
+        run: |
+          DATE=$(date +'%B %d, %Y')
+          HTML=$(cat "${{ steps.find.outputs.file }}")
+          curl -X POST 'https://api.resend.com/emails' \
+            -H "Authorization: Bearer ${{ secrets.RESEND_API_KEY }}" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n \
+              --arg html "$HTML" \
+              --arg subject "NP Digital Daily Briefing — $DATE" \
+              '{
+                "from": "Daily Briefing <onboarding@resend.dev>",
+                "to": ["dzagury@npdigital.com"],
+                "subject": $subject,
+                "html": $html
+              }'
+            )"
